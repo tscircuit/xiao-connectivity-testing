@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { parseDataRecord } from "./serial-parser";
 
 type Sample = {
   value: number;
@@ -508,20 +509,12 @@ export default function Home() {
           for (const rawLine of lines) {
             const line = rawLine.replace(/[\x00-\x1f>]/g, "").trim();
             if (!line) continue;
-            const dataIndex = line.indexOf("DATA,");
-            if (dataIndex >= 0) {
-              const record = line.slice(dataIndex);
-              const fields = record.split(",");
-              const values = fields.slice(1).map(Number);
-              if (
-                fields.length === 5 &&
-                values.every((value) => Number.isInteger(value))
-              ) {
-                if (runningRef.current) addScan(values);
-                appendLog(`RX  ${record}`);
-              } else {
-                appendLog(`ERROR  Malformed record: ${record.slice(0, 160)}`);
-              }
+            const parsed = parseDataRecord(line);
+            if (parsed.kind === "valid") {
+              if (runningRef.current) addScan(parsed.values);
+              appendLog(`RX  ${parsed.record}`);
+            } else if (parsed.kind === "invalid") {
+              appendLog(`ERROR  Malformed record: ${parsed.record.slice(0, 160)}`);
             } else if (!line.includes("raw REPL")) {
               appendLog(`RX  ${line.slice(0, 160)}`);
             }
